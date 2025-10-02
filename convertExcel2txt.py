@@ -2,6 +2,7 @@ import sys
 import os
 import re
 import pandas as pd
+from PyQt5.QtGui import QColor, QPixmap, QPainter, QFont, QTextDocument
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QTableWidget,
     QTableWidgetItem, QHeaderView, QHBoxLayout, QComboBox, QTextEdit,
@@ -104,7 +105,7 @@ def process_txt_files(file_paths, year=None, month=None):
 class ScheduleApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("排班表生成器 (V1.4)")
+        self.setWindowTitle("附二院排班表生成器 (V1.3.0)")
         self.resize(900, 650)
         layout = QVBoxLayout()
 
@@ -136,7 +137,7 @@ class ScheduleApp(QWidget):
         btn_layout = QHBoxLayout()
         self.generate_btn = QPushButton("生成排班表")
         btn_layout.addWidget(self.generate_btn)
-        self.save_btn = QPushButton("保存为 JPG 图片")
+        self.save_btn = QPushButton("保存为 PNG 图片")
         btn_layout.addWidget(self.save_btn)
         layout.addLayout(btn_layout)
 
@@ -197,61 +198,6 @@ class ScheduleApp(QWidget):
         self.remark_box.setText("\n".join(remarks) if remarks else "")
         self.generate_schedule_table(schedule_dict, year, month)
 
-    def on_save_png(self):
-        if not self.current_schedule_dict:
-            QMessageBox.warning(self, "提示", "无排班表可保存")
-            return
-
-        month = self.month_combo.currentData()
-        year = self.year_combo.currentData()
-        title_text = f"章总的 {month} 月排班表 ({year})"
-
-        scale_factor = 2  # 高分辨率倍数
-
-        # 渲染表格
-        table_pix = QPixmap(self.table.width() * scale_factor, self.table.height() * scale_factor)
-        table_pix.setDevicePixelRatio(scale_factor)
-        table_pix.fill(Qt.transparent)
-        self.table.render(table_pix)
-
-        # 渲染备注 QTextEdit
-        remark_pix = QPixmap(self.remark_box.width() * scale_factor, self.remark_box.height() * scale_factor)
-        remark_pix.setDevicePixelRatio(scale_factor)
-        remark_pix.fill(Qt.transparent)
-        self.remark_box.render(remark_pix)
-
-        # 计算总高度
-        spacing = 20
-        total_height = 80 + table_pix.height() + spacing + remark_pix.height()
-        total_width = max(table_pix.width(), remark_pix.width(), 600)
-        final_pix = QPixmap(total_width, total_height)
-        final_pix.setDevicePixelRatio(scale_factor)
-        final_pix.fill(Qt.white)
-
-        painter = QPainter(final_pix)
-
-        # 绘制标题（水平居中）
-        painter.setFont(QFont("Arial", 18, QFont.Bold))
-        logical_total_width = total_width / scale_factor
-        title_width = painter.fontMetrics().width(title_text)
-        x = (logical_total_width - title_width) / 2
-        y = 50  # 距离顶部固定50像素
-        painter.drawText(int(x), int(y), title_text)
-
-        # 绘制表格
-        painter.drawPixmap(0, 80, table_pix)
-
-        # 绘制备注
-        painter.drawPixmap(0, 80 + table_pix.height() + spacing, remark_pix)
-
-        painter.end()
-
-        save_path = os.path.join(os.getcwd(), f"章总的{month}月排班表.png")
-        final_pix.save(save_path, "PNG")
-        QMessageBox.information(self, "提示", f"排班表已保存为: {save_path}")
-
-
-
     # 生成表格内容
     def generate_schedule_table(self, schedule_dict, year, month):
         first_day = QDate(year, month, 1)
@@ -289,6 +235,89 @@ class ScheduleApp(QWidget):
 
                 self.table.setItem(row, col, item)
                 day += 1
+    #保存
+    def on_save_png(self):
+        if not self.current_schedule_dict:
+            QMessageBox.warning(self, "提示", "无排班表可保存")
+            return
+
+        month = self.month_combo.currentData()
+
+        # 临时修改 QLabel 标题，只在图片中显示
+        original_text = self.drag_label.text()
+        self.drag_label.setText(f"章总的{month}月排班表")
+
+        scale_factor = 2  # 高分辨率倍数
+
+        # 渲染整个窗口到 pixmap
+        w = self.width() * scale_factor
+        h = self.height() * scale_factor
+        pixmap = QPixmap(w, h)
+        pixmap.setDevicePixelRatio(scale_factor)
+        pixmap.fill(Qt.white)
+        self.render(pixmap)
+
+        # 自动裁掉多余空白
+        img = pixmap.toImage()
+        rect = img.rect()
+
+        top = 0
+        bottom = rect.height() - 1
+        left = 0
+        right = rect.width() - 1
+
+        # 扫描上边界
+        for y in range(rect.height()):
+            for x in range(rect.width()):
+                if QColor(img.pixel(x, y)) != QColor(Qt.white):
+                    top = y
+                    break
+            else:
+                continue
+            break
+
+        # 扫描下边界
+        for y in reversed(range(rect.height())):
+            for x in range(rect.width()):
+                if QColor(img.pixel(x, y)) != QColor(Qt.white):
+                    bottom = y
+                    break
+            else:
+                continue
+            break
+
+        # 扫描左边界
+        for x in range(rect.width()):
+            for y in range(rect.height()):
+                if QColor(img.pixel(x, y)) != QColor(Qt.white):
+                    left = x
+                    break
+            else:
+                continue
+            break
+
+        # 扫描右边界
+        for x in reversed(range(rect.width())):
+            for y in range(rect.height()):
+                if QColor(img.pixel(x, y)) != QColor(Qt.white):
+                    right = x
+                    break
+            else:
+                continue
+            break
+
+        cropped_pixmap = pixmap.copy(QRect(left, top, right - left + 1, bottom - top + 1))
+
+        # 保存 PNG
+        save_path = os.path.join(os.getcwd(), f"章总的{month}月排班表.png")
+        cropped_pixmap.save(save_path, "PNG")
+
+        # 恢复 QLabel 原始文本
+        self.drag_label.setText(original_text)
+
+        QMessageBox.information(self, "提示", f"排班表已保存为: {save_path}")
+
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
