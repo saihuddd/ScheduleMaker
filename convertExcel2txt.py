@@ -20,7 +20,18 @@ replace_rules = [
     ('15', '8.00~12.00 15'), ('西', '8.00~12.00 西'), ('备', '7.30~16.30 备'), ('帮', '8.30~16.15 帮'),
     ('休', '休息'), ('工', '工休')
 ]
-
+HOLIDAY_DICT = {
+    "2025-01-01": "元旦",
+    "2025-02-11": "春节",
+    "2025-02-12": "春节",
+    "2025-02-13": "春节",
+    "2025-04-05": "清明节",
+    "2025-05-01": "劳动节",
+    "2025-06-22": "端午节",
+    "2025-09-17": "中秋节",
+    "2025-10-01": "国庆节",
+    # 后续节日可以按同样格式添加
+}
 def generate_txt(files, month):
     if not files:
         return None
@@ -225,16 +236,29 @@ class ScheduleApp(QWidget):
                     continue
 
                 date_str = QDate(year, month, day).toString("yyyy-MM-dd")
-                text = f"{day}\n{schedule_dict.get(date_str, '')}"
+                schedule_text = schedule_dict.get(date_str, '')
+                holiday_name = HOLIDAY_DICT.get(date_str, '')
+
+                # 第一行显示日期+节日，节日字体红色
+                if holiday_name:
+                    text = f"{day} {holiday_name}\n{schedule_text}"
+                else:
+                    text = f"{day}\n{schedule_text}"
 
                 item = QTableWidgetItem(text)
                 item.setTextAlignment(Qt.AlignTop | Qt.AlignLeft)
                 item.setToolTip(text)
 
+                # 设置背景色（排班相关）
                 for k, c in color_map.items():
                     if k in text:
                         item.setBackground(c)
                         break
+
+                # 设置节日字体颜色
+                if holiday_name:
+                    # 这里只改字体颜色为红色，不影响背景
+                    item.setForeground(QColor("red"))
 
                 self.table.setItem(row, col, item)
                 day += 1
