@@ -9,7 +9,6 @@ from PyQt5.QtWidgets import (
     QMessageBox
 )
 from PyQt5.QtCore import Qt, QDate, QRect
-from PyQt5.QtGui import QColor, QPixmap, QPainter, QFont
 
 # ------------------- Excel -> TXT -------------------
 replace_rules = [
@@ -26,6 +25,8 @@ def generate_txt(files, month):
     if not files:
         return None
     current_directory = os.getcwd()
+    output_dir = os.path.join(current_directory, "output_txt")  # TXT 子文件夹
+    os.makedirs(output_dir, exist_ok=True)
     txt_file_paths = []
 
     def replace_column_in_text(input_file, replace_rules, column_number):
@@ -38,7 +39,9 @@ def generate_txt(files, month):
             columns = line.strip().split('\t')
             if len(columns) >= column_number:
                 for target_word, replace_word in replace_rules:
-                    columns[column_number - 1] = re.sub(rf'(?<!\S){target_word}(?!\S)', replace_word, columns[column_number - 1])
+                    columns[column_number - 1] = re.sub(
+                        rf'(?<!\S){target_word}(?!\S)', replace_word, columns[column_number - 1]
+                    )
             modified_lines.append('\t'.join(columns) + '\n')
         return modified_lines
 
@@ -53,7 +56,7 @@ def generate_txt(files, month):
         columns_to_keep = [col for col in ['日期','星期','章学亭'] if col in df.columns]
         df = df[columns_to_keep]
 
-        temp_txt = os.path.join(current_directory, os.path.basename(file_path).split('.')[0] + '_output.txt')
+        temp_txt = os.path.join(output_dir, os.path.basename(file_path).split('.')[0] + '_output.txt')
         df.to_csv(temp_txt, index=False, encoding='utf-8-sig', sep='\t')
         txt_file_paths.append(temp_txt)
 
@@ -61,7 +64,7 @@ def generate_txt(files, month):
     for txt_file in txt_file_paths:
         all_modified_lines.extend(replace_column_in_text(txt_file, replace_rules, column_number=3))
 
-    final_output_path = os.path.join(current_directory, f'章总的{month}月排班表.txt')
+    final_output_path = os.path.join(output_dir, f'章总的{month}月排班表.txt')
     with open(final_output_path, 'w', encoding='utf-8-sig') as f:
         f.writelines(all_modified_lines)
 
@@ -105,7 +108,7 @@ def process_txt_files(file_paths, year=None, month=None):
 class ScheduleApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("附二院排班表生成器 (V1.3.0)")
+        self.setWindowTitle("附二院排班表生成器 (V1.3.1)")
         self.resize(900, 650)
         layout = QVBoxLayout()
 
@@ -235,21 +238,18 @@ class ScheduleApp(QWidget):
 
                 self.table.setItem(row, col, item)
                 day += 1
-    #保存
+
+    # 保存 PNG
     def on_save_png(self):
         if not self.current_schedule_dict:
             QMessageBox.warning(self, "提示", "无排班表可保存")
             return
 
         month = self.month_combo.currentData()
-
-        # 临时修改 QLabel 标题，只在图片中显示
         original_text = self.drag_label.text()
         self.drag_label.setText(f"章总的{month}月排班表")
+        scale_factor = 2
 
-        scale_factor = 2  # 高分辨率倍数
-
-        # 渲染整个窗口到 pixmap
         w = self.width() * scale_factor
         h = self.height() * scale_factor
         pixmap = QPixmap(w, h)
@@ -257,16 +257,11 @@ class ScheduleApp(QWidget):
         pixmap.fill(Qt.white)
         self.render(pixmap)
 
-        # 自动裁掉多余空白
         img = pixmap.toImage()
         rect = img.rect()
+        top = bottom = left = right = 0
 
-        top = 0
-        bottom = rect.height() - 1
-        left = 0
-        right = rect.width() - 1
-
-        # 扫描上边界
+        # 自动裁掉空白
         for y in range(rect.height()):
             for x in range(rect.width()):
                 if QColor(img.pixel(x, y)) != QColor(Qt.white):
@@ -275,8 +270,6 @@ class ScheduleApp(QWidget):
             else:
                 continue
             break
-
-        # 扫描下边界
         for y in reversed(range(rect.height())):
             for x in range(rect.width()):
                 if QColor(img.pixel(x, y)) != QColor(Qt.white):
@@ -285,8 +278,6 @@ class ScheduleApp(QWidget):
             else:
                 continue
             break
-
-        # 扫描左边界
         for x in range(rect.width()):
             for y in range(rect.height()):
                 if QColor(img.pixel(x, y)) != QColor(Qt.white):
@@ -295,8 +286,6 @@ class ScheduleApp(QWidget):
             else:
                 continue
             break
-
-        # 扫描右边界
         for x in reversed(range(rect.width())):
             for y in range(rect.height()):
                 if QColor(img.pixel(x, y)) != QColor(Qt.white):
@@ -307,20 +296,17 @@ class ScheduleApp(QWidget):
             break
 
         cropped_pixmap = pixmap.copy(QRect(left, top, right - left + 1, bottom - top + 1))
-
-        # 保存 PNG
         save_path = os.path.join(os.getcwd(), f"章总的{month}月排班表.png")
         cropped_pixmap.save(save_path, "PNG")
-
-        # 恢复 QLabel 原始文本
         self.drag_label.setText(original_text)
-
         QMessageBox.information(self, "提示", f"排班表已保存为: {save_path}")
 
-
-
+# ------------------- 主程序 -------------------
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ScheduleApp()
     window.show()
     sys.exit(app.exec_())
+
+# ------------------- 版本号 -------------------
+APP_VERSION = "V1.3.1"
