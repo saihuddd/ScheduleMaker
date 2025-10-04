@@ -1,3 +1,6 @@
+# ------------------- 版本号 -------------------
+APP_VERSION = "v1.4.3"
+
 import sys
 import os
 import re
@@ -9,16 +12,19 @@ from PyQt5.QtWidgets import (
     QMessageBox
 )
 from PyQt5.QtCore import Qt, QDate, QRect
+import os
+import json
+
+# 在全局（所有函数外）定义
+json_path = os.path.join(os.getcwd(), "replace_rules.json")
+if os.path.exists(json_path):
+    with open(json_path, 'r', encoding='utf-8') as f:
+        replace_rules_dict = json.load(f)
+else:
+    replace_rules_dict = {}
 
 # ------------------- Excel -> TXT -------------------
 replace_rules = [
-    ('备1', '备1-可休'), ('十四', '8.00~16.45 十四'), ('夜', '21.30~7.30 夜'), ('晚', '15.30~22.30 晚'),
-    ('早', '7.30~15.00 早'), ('中', '15.00~21.30 中'), ('四', '8.00~16.45 四'), ('五', '8.00~12.00 五'),
-    ('二', '8.00~16.45 二'), ('三', '8.00~16.45 三'), ('九', '8.00~16.45 九'), ('十', '8.00~16.45 十'),
-    ('1', '8.00~16.45 1'), ('2', '7.00-15.00 2'), ('3', '7.00-15.00 3'), ('4', '7.30~17.15 4'),
-    ('5', '8.00~17.15 5'), ('6', '7.30~16.45 6'), ('7', '8.30~17.15 7'), ('9', '7.30~16.55 9'),
-    ('15', '8.00~12.00 15'), ('西', '8.00~12.00 西'), ('备', '7.30~16.30 备'), ('帮', '8.30~16.15 帮'),
-    ('休', '休息'), ('工', '工休')
 ]
 from lunarcalendar import Converter, Solar, Lunar
 
@@ -114,10 +120,13 @@ def generate_txt(files, month):
                 continue
             columns = line.strip().split('\t')
             if len(columns) >= column_number:
-                for target_word, replace_word in replace_rules:
+                # 遍历字典
+                for target_word, replace_word in sorted(replace_rules_dict.items(), key=lambda x: -len(x[0])):
                     columns[column_number - 1] = re.sub(
-                        rf'(?<!\S){target_word}(?!\S)', replace_word, columns[column_number - 1]
+                        rf'(?<!\S){re.escape(target_word)}(?!\S)', replace_word, columns[column_number - 1]
                     )
+                # 清理多余空格
+                columns[column_number - 1] = re.sub(r'\s+', ' ', columns[column_number - 1]).strip()
             modified_lines.append('\t'.join(columns) + '\n')
         return modified_lines
 
@@ -184,7 +193,7 @@ def process_txt_files(file_paths, year=None, month=None):
 class ScheduleApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("附二院排班表生成器 (V1.3.1)")
+        self.setWindowTitle(f"附二院排班表生成器 ({APP_VERSION})")
         self.resize(900, 650)
         layout = QVBoxLayout()
 
@@ -396,6 +405,3 @@ if __name__ == "__main__":
     window = ScheduleApp()
     window.show()
     sys.exit(app.exec_())
-
-# ------------------- 版本号 -------------------
-APP_VERSION = "V1.4.2"
