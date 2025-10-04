@@ -20,6 +20,25 @@ replace_rules = [
     ('15', '8.00~12.00 15'), ('西', '8.00~12.00 西'), ('备', '7.30~16.30 备'), ('帮', '8.30~16.15 帮'),
     ('休', '休息'), ('工', '工休')
 ]
+from lunarcalendar import Converter, Solar, Lunar
+
+# 农历数字转中文
+MONTH_NAMES = ["正月", "二月", "三月", "四月", "五月", "六月",
+               "七月", "八月", "九月", "十月", "冬月", "腊月"]
+DAY_NAMES = ["初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十",
+             "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十",
+             "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"]
+
+def get_lunar_label(year, month, day):
+    solar = Solar(year, month, day)
+    lunar = Converter.Solar2Lunar(solar)
+
+    # 如果初一 → 显示月份
+    if lunar.day == 1:
+        return MONTH_NAMES[lunar.month - 1]
+    else:
+        return DAY_NAMES[lunar.day - 1]
+
 HOLIDAY_DICT = {
     # 2025年（闰六月）
     "2025-01-01": "元旦",
@@ -32,7 +51,6 @@ HOLIDAY_DICT = {
     "2025-06-22": "端午节",
     "2025-08-22": "七夕节",
     "2025-10-06": "中秋节",
-    "2025-10-11": "重阳节",
     "2025-10-01": "国庆节",
     "2025-12-22": "冬至",
 
@@ -48,7 +66,6 @@ HOLIDAY_DICT = {
     "2026-08-11": "七夕节",
     "2026-09-10": "中秋节",
     "2026-10-01": "国庆节",
-    "2026-10-31": "重阳节",
     "2026-12-21": "冬至",
 
     # 2027年
@@ -63,7 +80,6 @@ HOLIDAY_DICT = {
     "2027-07-31": "七夕节",
     "2027-09-30": "中秋节",
     "2027-10-01": "国庆节",
-    "2027-10-20": "重阳节",
     "2027-12-21": "冬至",
 
     # 2028年
@@ -78,7 +94,6 @@ HOLIDAY_DICT = {
     "2028-08-19": "七夕节",
     "2028-09-18": "中秋节",
     "2028-10-01": "国庆节",
-    "2028-10-08": "重阳节",
     "2028-12-21": "冬至"
 }
 
@@ -289,11 +304,11 @@ class ScheduleApp(QWidget):
                 schedule_text = schedule_dict.get(date_str, '')
                 holiday_name = HOLIDAY_DICT.get(date_str, '')
 
-                # 第一行显示日期+节日，节日字体红色
-                if holiday_name:
+                if holiday_name:  # 优先节日
                     text = f"{day} {holiday_name}\n{schedule_text}"
-                else:
-                    text = f"{day}\n{schedule_text}"
+                else:  # 否则显示农历
+                    lunar_str = get_lunar_label(year, month, day)
+                    text = f"{day} {lunar_str}\n{schedule_text}"
 
                 item = QTableWidgetItem(text)
                 item.setTextAlignment(Qt.AlignTop | Qt.AlignLeft)
@@ -383,4 +398,4 @@ if __name__ == "__main__":
     sys.exit(app.exec_())
 
 # ------------------- 版本号 -------------------
-APP_VERSION = "V1.4.1"
+APP_VERSION = "V1.4.2"
