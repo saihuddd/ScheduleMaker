@@ -1,11 +1,11 @@
 # ------------------- 版本号 -------------------
-APP_VERSION = "v1.5.0"
+APP_VERSION = "v1.5.2"
 
 import sys
 import os
 import re
 import pandas as pd
-from PyQt5.QtGui import QColor, QPixmap, QPainter, QFont, QTextDocument
+from PyQt5.QtGui import QColor, QTextCursor, QTextCharFormat, QPixmap, QPainter, QFont, QTextDocument
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QTableWidget,
     QTableWidgetItem, QHeaderView, QHBoxLayout, QComboBox, QTextEdit,
@@ -64,12 +64,62 @@ else:
         json.dump(default_rules, f, ensure_ascii=False, indent=4)
 
     replace_rules_dict = default_rules  # 同时加载到内存
-    print(f"未检测到 replace_rules.json，已自动创建默认配置文件 -> {json_path}")
+    print(f"未检测到 replace_rules.json 已自动创建默认配置文件 -> {json_path}")
     
 # ------------------- Excel -> TXT -------------------
 replace_rules = [
 ]
 from lunarcalendar import Converter, Solar, Lunar
+
+# ------------------ 配色方案 ------------------
+COLOR_SCHEMES = {
+    "方案1": {  # 柔和风格
+        "COLOR_REST": QColor("#A6EBC3"),       
+        "COLOR_NIGHT": QColor("#DDE6F2"),      
+        "FONT_COLOR_HOLIDAY": QColor("#FF6347")
+    },
+    "方案2": {  # 活力 / 多巴胺风格
+        "COLOR_REST": QColor("#27AF27"),       # 明亮绿（LimeGreen）
+        "COLOR_NIGHT": QColor("#629DD8"),      # 明亮蓝（DodgerBlue）
+        "FONT_COLOR_HOLIDAY": QColor("#FF4500") # 鲜橙红（OrangeRed）
+    },
+    "方案3": {  # 柔暖风格
+        "COLOR_REST": QColor("#FFECB3"),       
+        "COLOR_NIGHT": QColor("#FFCDD2"),      
+        "FONT_COLOR_HOLIDAY": QColor("#D32F2F")
+    },
+    "方案4": {  # 沉稳风格
+        "COLOR_REST": QColor("#80CBC4"),       
+        "COLOR_NIGHT": QColor("#546E7A"),      
+        "FONT_COLOR_HOLIDAY": QColor("#FF7043")
+    }
+}
+
+# 月份 -> 配色方案映射
+MONTH_COLOR_MAP = {
+    1: "方案1",
+    2: "方案2",
+    3: "方案3",
+    4: "方案4",
+    5: "方案1",
+    6: "方案2",
+    7: "方案3",
+    8: "方案4",
+    9: "方案1",
+    10: "方案2",
+    11: "方案3",
+    12: "方案4"
+}
+
+LINE_COLOR = "#E0E0E0"
+TITLE_BG = "#F7F7F7"
+FONT_FAMILY = "Microsoft YaHei"  # 或者 "PingFang" / "SimHei" / "Source Han Sans"
+DATE_FONT = QFont(FONT_FAMILY, 10, QFont.Bold)
+LUNAR_FONT = QFont(FONT_FAMILY, 9)
+BODY_FONT = QFont(FONT_FAMILY, 10)
+NOTE_FONT = QFont(FONT_FAMILY, 9)
+
+CELL_PADDING = 8
 
 # 农历数字转中文
 MONTH_NAMES = ["正月", "二月", "三月", "四月", "五月", "六月",
@@ -350,43 +400,68 @@ class ScheduleApp(QWidget):
 
         start_col = (first_day.dayOfWeek()-1) % 7
         day = 1
-        color_map = {"休": QColor("#90EE90"), "夜": QColor("#D3D3D3"), "21.30~7.30": QColor("#D3D3D3")}
+
+        # ----------------- 获取当月配色方案 -----------------
+        scheme_name = MONTH_COLOR_MAP.get(month, "方案1")
+        scheme = COLOR_SCHEMES[scheme_name]
+        COLOR_REST = scheme["COLOR_REST"]
+        COLOR_NIGHT = scheme["COLOR_NIGHT"]
+        FONT_COLOR_HOLIDAY = scheme["FONT_COLOR_HOLIDAY"]
+
+        # 更新 color_map
+        color_map = {"休息": COLOR_REST,
+                     "工休": COLOR_REST, 
+                     "夜": COLOR_NIGHT, 
+                     "21.30~7.30": COLOR_NIGHT
+                     }
 
         for row in range(total_rows):
             for col in range(7):
                 if row == 0 and col < start_col:
-                    self.table.setItem(row, col, QTableWidgetItem(""))
+                    self.table.setCellWidget(row, col, QLabel(""))
                     continue
                 if day > days_in_month:
-                    self.table.setItem(row, col, QTableWidgetItem(""))
+                    self.table.setCellWidget(row, col, QLabel(""))
                     continue
 
                 date_str = QDate(year, month, day).toString("yyyy-MM-dd")
                 schedule_text = schedule_dict.get(date_str, '')
                 holiday_name = HOLIDAY_DICT.get(date_str, '')
 
-                if holiday_name:  # 优先节日
-                    text = f"{day} {holiday_name}\n{schedule_text}"
-                else:  # 否则显示农历
-                    lunar_str = get_lunar_label(year, month, day)
-                    text = f"{day} {lunar_str}\n{schedule_text}"
+                # 创建标签用于显示富文本
+                label = QLabel()
+                label.setWordWrap(True)  # 允许文本换行
+                label.setMargin(2)  # 设置边距
 
-                item = QTableWidgetItem(text)
-                item.setTextAlignment(Qt.AlignTop | Qt.AlignLeft)
-                item.setToolTip(text)
+                # 构建HTML文本
+                html_text = []
+                html_text.append(f"<span style='color: black;'>{day}</span>")  # 日期数字(黑色)
+                
+                if holiday_name:
+                    # 节日名称(红色)
+                    html_text.append(f"<span style='color: #FF6347;'>{holiday_name}</span>")
+                else:
+                    # 农历日期(灰色)
+                    lunar_str = get_lunar_label(year, month, day)
+                    html_text.append(f"<span style='color: #808080;'>{lunar_str}</span>")
+                
+                # 排班内容(黑色)
+                if schedule_text:
+                    html_text.append(f"<span style='color: black;'>{schedule_text}</span>")
+                
+                # 设置HTML文本
+                label.setText("<br>".join(html_text))
+                
+                # 设置单元格部件
+                self.table.setCellWidget(row, col, label)
 
                 # 设置背景色（排班相关）
-                for k, c in color_map.items():
-                    if k in text:
-                        item.setBackground(c)
-                        break
+                if schedule_text:
+                    for index, color in color_map.items():
+                        if index in schedule_text:
+                            label.setStyleSheet(f"background-color: {color.name()};")
+                            break
 
-                # 设置节日字体颜色
-                if holiday_name:
-                    # 这里只改字体颜色为红色，不影响背景
-                    item.setForeground(QColor("red"))
-
-                self.table.setItem(row, col, item)
                 day += 1
 
     # 保存 PNG
@@ -397,7 +472,7 @@ class ScheduleApp(QWidget):
 
         month = self.month_combo.currentData()
         original_text = self.drag_label.text()
-        self.drag_label.setText(f"章总的{month}月排班表")
+        self.drag_label.setText(f"章学亭的{month}月排班表")
         scale_factor = 2
 
         w = self.width() * scale_factor
