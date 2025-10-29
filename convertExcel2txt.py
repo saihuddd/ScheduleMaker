@@ -1,5 +1,5 @@
 # ------------------- 版本号 -------------------
-APP_VERSION = "v1.5.2"
+APP_VERSION = "v1.5.3"
 
 import sys
 import os
@@ -21,7 +21,6 @@ if getattr(sys, 'frozen', False):
     base_path = os.path.dirname(sys.executable)
 else:
     base_path = os.getcwd()
-
 json_path = os.path.join(base_path, "replace_rules.json")
 
 # 如果文件存在则读取，否则自动创建默认模板
@@ -32,29 +31,29 @@ else:
     # 定义默认规则
     default_rules = {
         "备1": "备1-可休",
-        "十四": "8.00~16.45 十四",
-        "夜": "21.30~7.30 夜",
-        "晚": "15.00~22.30 晚",
-        "早": "7.30~15.00 早",
-        "中": "15.00~21.30 中",
-        "四": "8.00~16.45 四",
-        "五": "8.00~12.00 五",
-        "二": "8.00~16.45 二",
-        "三": "8.00~16.45 三",
-        "九": "8.00~16.45 九",
-        "十": "8.00~16.45 十",
-        "1": "8.00~16.45 1",
-        "2": "7.00-15.00 2",
-        "3": "7.00-15.00 3",
-        "4": "7.30~17.15 4",
-        "5": "8.00~17.15 5",
-        "6": "7.30~16.45 6",
-        "7": "8.30~17.15 7",
-        "9": "7.30~16.55 9",
-        "15": "8.00~12.00 15",
-        "西": "8.00~12.00 西",
-        "备": "7.30~16.30 备",
-        "帮": "8.30~16.15 帮",
+        "十四": "十四 8.00~16.45",
+        "夜": "夜 21.30~7.30",
+        "晚": "晚 15.00~22.30",
+        "早": "早 7.30~15.00",
+        "中": "中 15.00~21.30",
+        "四": "四 8.00~16.45",
+        "五": "五 8.00~12.00",
+        "二": "二 8.00~16.45",
+        "三": "三 8.00~16.45",
+        "九": "九 8.00~16.45",
+        "十": "十 8.00~16.45",
+        "1": "1 8.00~16.45",
+        "2": "2 7.00-15.00",
+        "3": "3 7.00-15.00",
+        "4": "4 7.30~17.15",
+        "5": "5 8.00~17.15",
+        "6": "6 7.30~16.45",
+        "7": "7 8.30~17.15",
+        "9": "9 7.30~16.55",
+        "15": "15 8.00~12.00",
+        "西": "西 8.00~12.00",
+        "备": "备 7.30~16.30",
+        "帮": "帮 8.30~16.15",
         "休": "休息",
         "工": "工休"
     }
@@ -435,19 +434,22 @@ class ScheduleApp(QWidget):
 
                 # 构建HTML文本
                 html_text = []
-                html_text.append(f"<span style='color: black;'>{day}</span>")  # 日期数字(黑色)
-                
+                # 第一行：日期数字（和节假日）
+                first_line = f"<span style='color: black;'>{day}</span>"
                 if holiday_name:
-                    # 节日名称(红色)
-                    html_text.append(f"<span style='color: #FF6347;'>{holiday_name}</span>")
-                else:
-                    # 农历日期(灰色)
-                    lunar_str = get_lunar_label(year, month, day)
-                    html_text.append(f"<span style='color: #808080;'>{lunar_str}</span>")
+                    first_line += f" <span style='color: #FF6347;'>{holiday_name}</span>"
+                html_text.append(first_line)
                 
-                # 排班内容(黑色)
+                # 最后一行：排班内容
                 if schedule_text:
-                    html_text.append(f"<span style='color: black;'>{schedule_text}</span>")
+                    # 将班次和时间分开，假设格式为"班次 时间"
+                    parts = schedule_text.split(' ', 1)  # 只分割第一个空格
+                    if len(parts) > 1:
+                        班次, 时间 = parts
+                        html_text.append(f"<span style='color: black;'>{班次}</span> <span style='color: #808080;'>{时间}</span>")
+                    else:
+                        # 如果没有时间部分（比如"休息"），就全部用黑色显示
+                        html_text.append(f"<span style='color: black;'>{schedule_text}</span>")
                 
                 # 设置HTML文本
                 label.setText("<br>".join(html_text))
