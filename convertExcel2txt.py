@@ -1,5 +1,5 @@
 # ------------------- 版本号 -------------------
-APP_VERSION = "v1.5.3"
+APP_VERSION = "v1.6.0"
 
 import sys
 import os
@@ -9,7 +9,7 @@ from PyQt5.QtGui import QColor, QTextCursor, QTextCharFormat, QPixmap, QPainter,
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QTableWidget,
     QTableWidgetItem, QHeaderView, QHBoxLayout, QComboBox, QTextEdit,
-    QMessageBox
+    QMessageBox, QLineEdit
 )
 from PyQt5.QtCore import Qt, QDate, QRect
 import os
@@ -239,7 +239,17 @@ def generate_txt(files, month):
         df.columns = df.columns.str.strip()
         if '星期' in df.columns:
             df['星期'] = df['星期'].apply(lambda x: '    ' + x if isinstance(x, str) else x)
-        columns_to_keep = [col for col in ['日期','星期','章学亭'] if col in df.columns]
+        name = window.name_input.text() if hasattr(window, 'name_input') else None
+        columns_to_keep = ['日期', '星期']
+        if name:
+            # 去除输入名字中的空格
+            name_no_space = name.replace(' ', '')
+            # 查找匹配的列名（忽略空格）
+            for col in df.columns:
+                if col.replace(' ', '') == name_no_space:
+                    columns_to_keep.append(col)
+                    break
+        columns_to_keep = [col for col in columns_to_keep if col in df.columns]
         df = df[columns_to_keep]
 
         temp_txt = os.path.join(output_dir, os.path.basename(file_path).split('.')[0] + '_output.txt')
@@ -250,7 +260,8 @@ def generate_txt(files, month):
     for txt_file in txt_file_paths:
         all_modified_lines.extend(replace_column_in_text(txt_file, replace_rules, column_number=3))
 
-    final_output_path = os.path.join(output_dir, f'章总的{month}月排班表.txt')
+    name = window.name_input.text() if hasattr(window, 'name_input') else "排班表"
+    final_output_path = os.path.join(output_dir, f'{name}的{month}月排班表.txt')
     with open(final_output_path, 'w', encoding='utf-8-sig') as f:
         f.writelines(all_modified_lines)
 
@@ -303,8 +314,15 @@ class ScheduleApp(QWidget):
         self.drag_label.setStyleSheet("border: 2px dashed #aaa; font-size: 18px; padding: 10px;")
         layout.addWidget(self.drag_label)
 
+        # 年月和姓名选择
+        input_layout = QHBoxLayout()
+        
+        # 姓名输入
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("请输入姓名")
+        self.name_input.setText("章学亭")  # 默认值
+        
         # 年月选择
-        ym_layout = QHBoxLayout()
         self.year_combo = QComboBox()
         current_year = QDate.currentDate().year()
         for y in range(current_year-5, current_year+6):
@@ -316,11 +334,13 @@ class ScheduleApp(QWidget):
             self.month_combo.addItem(f"{m}月", m)
         self.month_combo.setCurrentIndex(QDate.currentDate().month()-1)
 
-        ym_layout.addWidget(QLabel("年份:"))
-        ym_layout.addWidget(self.year_combo)
-        ym_layout.addWidget(QLabel("月份:"))
-        ym_layout.addWidget(self.month_combo)
-        layout.addLayout(ym_layout)
+        input_layout.addWidget(QLabel("姓名:"))
+        input_layout.addWidget(self.name_input)
+        input_layout.addWidget(QLabel("年份:"))
+        input_layout.addWidget(self.year_combo)
+        input_layout.addWidget(QLabel("月份:"))
+        input_layout.addWidget(self.month_combo)
+        layout.addLayout(input_layout)
 
         # 按钮
         btn_layout = QHBoxLayout()
@@ -474,7 +494,8 @@ class ScheduleApp(QWidget):
 
         month = self.month_combo.currentData()
         original_text = self.drag_label.text()
-        self.drag_label.setText(f"章学亭的{month}月排班表")
+        name = self.name_input.text()
+        self.drag_label.setText(f"{name}的{month}月排班表")
         scale_factor = 2
 
         w = self.width() * scale_factor
@@ -523,7 +544,8 @@ class ScheduleApp(QWidget):
             break
 
         cropped_pixmap = pixmap.copy(QRect(left, top, right - left + 1, bottom - top + 1))
-        save_path = os.path.join(os.getcwd(), f"章总的{month}月排班表.png")
+        name = self.name_input.text()
+        save_path = os.path.join(os.getcwd(), f"{name}的{month}月排班表.png")
         cropped_pixmap.save(save_path, "PNG")
         self.drag_label.setText(original_text)
         QMessageBox.information(self, "提示", f"排班表已保存为: {save_path}")
