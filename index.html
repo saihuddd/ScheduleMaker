@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排班表生成器</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            border-radius: 4px;
+            background-color: #fafafa;
+        }
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        .input-group {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <h1>排班表生成器 Demo</h1>
+        
+        <div class="upload-area">
+            <input 
+                type="file" 
+                @change="handleFileSelect" 
+                accept=".xlsx,.xls"
+                style="display: none" 
+                ref="fileInput"
+            >
+            <button class="btn" @click="$refs.fileInput.click()">
+                选择Excel文件
+            </button>
+            <p>或将文件拖到此处</p>
+            <p v-if="selectedFile">已选择: {{ selectedFile.name }}</p>
+        </div>
+
+        <div class="input-group">
+            <input 
+                v-model="name" 
+                placeholder="请输入姓名"
+            >
+            <select v-model="selectedMonth">
+                <option v-for="m in 12" :key="m" :value="m">{{m}}月</option>
+            </select>
+            <button 
+                class="btn"
+                @click="generateSchedule"
+                :disabled="!selectedFile"
+            >
+                生成排班表
+            </button>
+        </div>
+
+        <p style="text-align: center; color: #666;">
+            这是一个简单的演示页面，展示了基本的文件上传和界面交互。<br>
+            GitHub Pages 演示版本
+        </p>
+    </div>
+
+    <script>
+        const { createApp, ref } = Vue
+
+        createApp({
+            setup() {
+                const selectedFile = ref(null)
+                const name = ref('')
+                const selectedMonth = ref(new Date().getMonth() + 1)
+                const fileInput = ref(null)
+
+                const handleFileSelect = (event) => {
+                    const file = event.target.files[0]
+                    if (file) {
+                        selectedFile.value = file
+                    }
+                }
+
+                const generateSchedule = () => {
+                    alert('演示版本：这里将处理Excel文件并生成排班表\n' +
+                          `文件：${selectedFile.value.name}\n` +
+                          `姓名：${name.value}\n` +
+                          `月份：${selectedMonth.value}月`)
+                }
+
+                return {
+                    selectedFile,
+                    name,
+                    selectedMonth,
+                    fileInput,
+                    handleFileSelect,
+                    generateSchedule
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
